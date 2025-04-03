@@ -12,49 +12,52 @@ import WelcomeScreen from '../screens/WelcomeScreen';
 const Stack = createNativeStackNavigator();
 
 export default function AuthGate() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [showWelcome, setShowWelcome] = useState(true);
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [showWelcome, setShowWelcome] = useState(true);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setUser(user);
+            setLoading(false);
+        });
 
-    return unsubscribe;
-  }, []);
+        return unsubscribe;
+    }, []);
 
-  if (loading) {
+    if (loading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#ee2a7b" />
+            </View>
+        );
+    }
+
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#ee2a7b" />
-      </View>
+        <Stack.Navigator>
+            {showWelcome ? (
+                <Stack.Screen
+                    name="Welcome"
+                    options={{ header: () => <GradientHeader title="Welcome" /> }}
+                >
+                    {() => <WelcomeScreen onContinue={() => setShowWelcome(false)} />}
+                </Stack.Screen>
+            ) : user ? (
+                <Stack.Screen
+                    name="HomeTabs"
+                    component={HomeTabs}
+                    options={{ 
+                        header: () => <GradientHeader title="Home" />, 
+                        headerShown: false
+                    }}
+                />
+            ) : (
+                <Stack.Screen
+                    name="Login"
+                    component={LoginScreen}
+                    options={{ header: () => <GradientHeader title="Login" /> }}
+                />
+            )}
+        </Stack.Navigator>
     );
-  }
-
-  return (
-    <Stack.Navigator>
-      {showWelcome ? (
-        <Stack.Screen
-          name="Welcome"
-          options={{ header: () => <GradientHeader title="Welcome" /> }}
-        >
-          {() => <WelcomeScreen onContinue={() => setShowWelcome(false)} />}
-        </Stack.Screen>
-      ) : user ? (
-        <Stack.Screen
-          name="HomeTabs"
-          component={HomeTabs}
-          options={{ header: () => <GradientHeader title="Home" /> }}
-        />
-      ) : (
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ header: () => <GradientHeader title="Login" /> }}
-        />
-      )}
-    </Stack.Navigator>
-  );
 }

@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   },
   premiumCard: {
     width: 280,
-    height: 160,
+    height: 320,
     marginRight: 16,
     borderRadius: 12,
     overflow: 'hidden',
@@ -212,6 +212,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   venueList: {
+    maxWidth: 500,
     paddingBottom: 80,
     paddingHorizontal: 16,
   },

@@ -1,8 +1,6 @@
 import React from 'react';
-import { View, Text, Button, Image, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
 import GradientButton from '../components/GradientButton'; // Assuming you have a GradientButton component
-import { Ionicons } from '@expo/vector-icons';
-import { StatusBar } from 'expo-status-bar';
 
 export default function WelcomeScreen({ onContinue }) {
 
