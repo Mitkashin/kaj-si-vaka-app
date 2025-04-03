@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, Modal, TextInput, Pressable, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import GradientButton from '../components/GradientButton';
-import { db } from '../utils/firebaseConfig';
+import { db, auth } from '../utils/firebaseConfig';
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 
 export default function VenueDetailsScreen({ route }) {
@@ -40,14 +40,30 @@ export default function VenueDetailsScreen({ route }) {
       alert('Please fill in both Date and Time.');
       return;
     }
+  
     try {
+      const user = auth.currentUser;
+  
+      if (!user) {
+        alert('You must be logged in to book.');
+        return;
+      }
+  
+      // Fetch additional profile info from Firestore
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDoc.exists() ? userDoc.data() : {};
+  
       await addDoc(collection(db, 'venues', venueId, 'bookings'), {
-        date,
-        time,
+        userId: user.uid,
+        userName: userData.username || user.displayName || 'Anonymous',
+        userEmail: user.email,
         notes,
         guests,
+        date,
+        time,
         createdAt: serverTimestamp(),
       });
+  
       alert('Booking submitted!');
       setModalVisible(false);
       setDate('');

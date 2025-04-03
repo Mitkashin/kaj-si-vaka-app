@@ -38,6 +38,8 @@ export default function LoginScreen({ navigation }) {
                     username: formData.username,
                     email: formData.email,
                     phone: formData.phone,
+                    role: 'user',
+                    venueIds: [],
                     createdAt: serverTimestamp(),
                 });
                 alert('Account created! You can log in now.');
