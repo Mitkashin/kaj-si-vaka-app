@@ -30,7 +30,7 @@ export default function RootNavigator() {
                     name="HomeTabs"
                     component={HomeTabs}
                     options={{
-                        header: () => <GradientHeader title="HomeTabs" />
+                        header: () => <GradientHeader title="Home" />
                     }}
                 />
 

@@ -7,7 +7,6 @@ import HomeScreen from '../screens/HomeScreen';
 import MapScreen from '../screens/MapScreen';
 import CreateScreen from '../screens/CreateScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import AnimatedTabIcon from '../components/AnimatedTabIcon';
 
 const Tab = createBottomTabNavigator();
 
@@ -33,7 +32,7 @@ export default function HomeTabs() {
                 tabBarLabel: ({ focused }) => (
                     <Text style={{
                         fontSize: 12,
-                        fontWeight: '600',
+                                fontWeight: '600',
                         color: focused ? '#ee2a7b' : 'gray'
                     }}>{route.name}</Text>
                 ),

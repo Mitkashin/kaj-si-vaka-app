@@ -1,53 +1,36 @@
 import React from 'react';
-import { TouchableOpacity, StyleSheet, View, Text } from 'react-native';
+import { TouchableOpacity, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import MaskedView from '@react-native-masked-view/masked-view';
 
-export default function GradientOutlineButton({ title, onPress, icon, style, textStyle }) {
+export default function GradientButton({ title, onPress, icon, style, textStyle }) {
     return (
-        <LinearGradient
-            colors={['#f9ce34', '#ee2a7b', '#6228d7']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.gradientBorder, style]}
-        >
-            <TouchableOpacity onPress={onPress} style={styles.inner}>
-                <MaskedView
-                    maskElement={
-                        <View style={styles.row}>
-                            {icon && <View style={styles.iconWrapper}>{icon}</View>}
-                            <Text style={[styles.text, textStyle]}>{title}</Text>
-                        </View>
-                    }
-                >
-                    <LinearGradient
-                        colors={['#f9ce34', '#ee2a7b', '#6228d7']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={{ paddingHorizontal: 10 }}
-                    >
-                        <View style={styles.row}>
-                            {icon && <View style={styles.iconWrapper}>{icon}</View>}
-                            <Text style={[styles.text, textStyle, { opacity: 0 }]}>{title}</Text>
-                        </View>
-                    </LinearGradient>
-                </MaskedView>
-            </TouchableOpacity>
-        </LinearGradient>
+        <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+            <LinearGradient
+                colors={['#f9ce34', '#ee2a7b', '#6228d7']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.button, style]}
+            >
+                <View style={styles.row}>
+                    {icon && <View style={styles.iconWrapper}>{icon}</View>}
+                    <Text style={[styles.text, textStyle]}>{title}</Text>
+                </View>
+            </LinearGradient>
+        </TouchableOpacity>
     );
 }
 
 const styles = StyleSheet.create({
-    gradientBorder: {
-        padding: 2,
-        borderRadius: 30,
+    touchable: {
+        borderRadius: 30, // ✅ Match the gradient container
+        overflow: 'hidden', // ✅ Clip to shape so touches pass correctly
     },
-    inner: {
-        backgroundColor: 'transparent',
-        borderRadius: 28,
-        paddingVertical: 10,
-        paddingHorizontal: 20,
+    button: {
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 30,
         alignItems: 'center',
+        justifyContent: 'center',
     },
     row: {
         flexDirection: 'row',
@@ -57,7 +40,7 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     text: {
-        color: 'white',
+        color: 'white', // ✅ Solid white text
         fontSize: 16,
         fontWeight: 'bold',
     },
