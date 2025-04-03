@@ -8,6 +8,7 @@ import MapScreen from '../screens/MapScreen';
 import CreateScreen from '../screens/CreateScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
+
 const Tab = createBottomTabNavigator();
 
 export default function HomeTabs() {

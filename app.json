@@ -2,12 +2,7 @@
   "expo": {
     "name": "KajSiVaka",
     "slug": "KajSiVaka",
-    "version": "0.0.1",
-    "splash": {
-      "image": "./assets/splash.webp",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    }
+    "version": "0.0.1"
     
   }
   

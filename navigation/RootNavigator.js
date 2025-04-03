@@ -5,6 +5,7 @@ import GradientHeader from '../components/GradientHeader';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import HomeTabs from './HomeTabs';
+import VenueDetailsScreen from '../screens/VenueDetailsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -33,10 +34,13 @@ export default function RootNavigator() {
                         header: () => <GradientHeader title="Home" />
                     }}
                 />
-
-                {/* <Stack.Screen name="Welcome" component={WelcomeScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="HomeTabs" component={HomeTabs} /> */}
+                <Stack.Screen
+                    name="VenueDetails"
+                    component={VenueDetailsScreen}
+                    options={{
+                        header: () => <GradientHeader title="Venue Details" />
+                    }}
+                />
             </Stack.Navigator>
         </NavigationContainer>
     );
