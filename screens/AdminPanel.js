@@ -170,11 +170,12 @@ export default function AdminPanel({ navigation }) {
             </View>
           </View>
         ))}
-        <GradientButton
-          title="View All"
-          onPress={() => navigation.navigate('AllBookings')}
-          style={{ marginTop: 10, maxWidth: 500 ,alignSelf: 'center' }}
-        />
+        <View style={styles.centeredButton}>
+          <GradientButton
+            title="View All"
+            onPress={() => navigation.navigate('AllBookings')}
+          />
+        </View>
       </View>
 
       {/* TOP VENUES */}
@@ -338,6 +339,13 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
+  centeredButton: {
+    marginTop: 12,
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 400,
+  },
+  
 
   card: {
     padding: 16,

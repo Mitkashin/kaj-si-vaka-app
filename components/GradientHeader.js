@@ -1,45 +1,58 @@
-import React, { useState } from 'react';
-import { View, Image, StyleSheet, Text } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
-export default function GradientHeader({ title = 'Kaj Si Vaka' }) {
-    const [logoError, setLogoError] = useState(false);
+export default function GradientHeader({ showBack = false, navigation }) {
+  return (
+    <LinearGradient
+      colors={['#f9ce34', '#ee2a7b', '#6228d7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.header}
+    >
+      <View style={styles.inner}>
+        {showBack ? (
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={26} color="#fff" />
+          </TouchableOpacity>
+        ) : (
+             // invisible spacer for symmetry
+          <View style={styles.backBtn} />
+        )}
 
-    return (
-        <LinearGradient
-            colors={['#f9ce34', '#ee2a7b', '#6228d7']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.container}
-        >
-            {!logoError ? (
-                <Image
-                    source={require('../assets/logo2.png')}
-                    style={styles.logo}
-                    resizeMode="contain"
-                    onError={() => setLogoError(true)}
-                />
-            ) : (
-                <Text style={styles.title}>{title}</Text>
-            )}
-        </LinearGradient>
-    );
+        <Image
+          source={require('../assets/logo2.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        {/* right-side spacer to center logo */}
+        <View style={styles.backBtn} /> 
+      </View>
+    </LinearGradient>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        height: 70,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingTop: 25,
-    },
-    logo: {
-        height: 60,
-        width: 140,
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: 'white',
-    },
+  header: {
+    paddingTop: 20,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    minHeight: 60
+  },
+  inner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backBtn: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logo: {
+    height: 50,
+    width: 120,
+  },
 });

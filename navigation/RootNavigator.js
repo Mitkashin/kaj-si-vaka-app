@@ -3,38 +3,44 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import GradientHeader from '../components/GradientHeader';
 import VenueDetailsScreen from '../screens/VenueDetailsScreen';
-import AuthGate from '../components/AuthGate'; // ✅ new
+import AuthGate from '../components/AuthGate';
 import AllBookingsScreen from '../screens/AllBookingsScreen';
-
 
 const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
-    return (
-        <NavigationContainer>
-            <Stack.Navigator>
-                {/* Auth-protected entry point */}
-                <Stack.Screen
-                    name="AuthGate"
-                    component={AuthGate}
-                    options={{ headerShown: false }}
-                />
+  return (
+    <NavigationContainer>
+      <Stack.Navigator>
+        {/* Auth-protected entry point */}
+        <Stack.Screen
+          name="AuthGate"
+          component={AuthGate}
+          options={{ headerShown: false }}
+        />
 
-                {/* Public route for venue details */}
-                <Stack.Screen
-                    name="VenueDetails"
-                    component={VenueDetailsScreen}
-                    options={{
-                        header: () => <GradientHeader title="Venue Details" />
-                    }}
-                />
-                <Stack.Screen
-                    name="AllBookings"
-                    component={AllBookingsScreen}
-                    options={{ title: 'All Bookings' }}
-                />
+        {/* Venue Details screen with custom back-enabled header */}
+        <Stack.Screen
+          name="VenueDetails"
+          component={VenueDetailsScreen}
+          options={({ navigation }) => ({
+            header: () => (
+              <GradientHeader title="Venue Details" showBack navigation={navigation} />
+            ),
+          })}
+        />
 
-            </Stack.Navigator>
-        </NavigationContainer>
-    );
+        {/* All Bookings screen with custom back-enabled header */}
+        <Stack.Screen
+          name="AllBookings"
+          component={AllBookingsScreen}
+          options={({ navigation }) => ({
+            header: () => (
+              <GradientHeader title="All Bookings" showBack navigation={navigation} />
+            ),
+          })}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
 }
