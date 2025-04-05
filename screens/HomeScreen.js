@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, Image, TouchableOpacity,
-  ActivityIndicator, RefreshControl, TextInput, Platform, Animated
+  ActivityIndicator, RefreshControl, TextInput, Platform,  Animated, Dimensions
 } from 'react-native';
 import {
   doc,
@@ -28,6 +28,12 @@ export default function HomeScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [userDoc, setUserDoc] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+
+  
+  const screenWidth = Dimensions.get('window').width;
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef(null);
 
   const FadeInImage = ({ uri }) => {
     const fadeAnim = useState(new Animated.Value(0))[0];
@@ -40,7 +46,7 @@ export default function HomeScreen({ navigation }) {
           Animated.timing(fadeAnim, {
             toValue: 1,
             duration: 500,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }).start();
         }}
         resizeMode="cover"
@@ -79,6 +85,18 @@ export default function HomeScreen({ navigation }) {
       console.error('Error loading venues:', error);
     }
   };
+
+  useEffect(() => {
+    if (premiumVenues.length === 0) return;
+  
+    const interval = setInterval(() => {
+      const nextIndex = (carouselIndex + 1) % premiumVenues.length;
+      scrollRef.current?.scrollTo({ x: nextIndex * (screenWidth * 0.75 + 16), animated: true });
+      setCarouselIndex(nextIndex);
+    }, 4000); // Change slide every 4s
+  
+    return () => clearInterval(interval);
+  }, [carouselIndex, premiumVenues]);
 
   const fetchEvents = async () => {
     try {
@@ -196,47 +214,40 @@ export default function HomeScreen({ navigation }) {
       </ScrollView>
 
       {/* Premium Venue Carousel */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.carouselScroll}>
+      {/* Auto-sliding Premium Carousel */}
+      <Animated.ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.carouselScroll}
+        scrollEventThrottle={16}
+        pagingEnabled={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          { useNativeDriver: false }
+        )}
+        snapToInterval={screenWidth * 0.75 + 16}
+        decelerationRate="fast"
+      >
         {premiumVenues.map((item) => {
           const isBookmarked = userDoc?.bookmarkedVenues?.includes(item.id);
-
           const toggleFavorite = async () => {
-            try {
-              const user = auth.currentUser;
-              if (!user) {
-                Alert.alert('Please log in to save favorites.');
-                return;
-              }
-
-              const userRef = doc(db, 'users', user.uid);
-              await updateDoc(userRef, {
-                bookmarkedVenues: isBookmarked
-                  ? arrayRemove(item.id)
-                  : arrayUnion(item.id),
-              });
-
-              fetchUserDoc(); // refresh
-            } catch (err) {
-              console.error('Error toggling favorite:', err);
-            }
+            const user = auth.currentUser;
+            if (!user) return Alert.alert('Please log in to save favorites.');
+            const userRef = doc(db, 'users', user.uid);
+            await updateDoc(userRef, {
+              bookmarkedVenues: isBookmarked ? arrayRemove(item.id) : arrayUnion(item.id),
+            });
+            fetchUserDoc();
           };
 
           return (
-            <View key={item.id} style={styles.premiumCard}>
+            <View key={item.id} style={[styles.premiumCard, { width: screenWidth * 0.75 }]}>
               <TouchableOpacity style={styles.imageWrapper} onPress={() => handleCardPress(item)}>
-              <FadeInImage 
-                  uri={item.imageUrl}
-                  resizeMode="cover"
-                />
-
+                <FadeInImage uri={item.imageUrl} />
                 <TouchableOpacity onPress={toggleFavorite} style={styles.heartIconPremium}>
-                  <Ionicons
-                    name={isBookmarked ? 'heart' : 'heart-outline'}
-                    size={22}
-                    color={isBookmarked ? '#ee2a7b' : '#444'}
-                  />
+                  <Ionicons name={isBookmarked ? 'heart' : 'heart-outline'} size={22} color={isBookmarked ? '#ee2a7b' : '#444'} />
                 </TouchableOpacity>
-
                 <View style={styles.premiumOverlay}>
                   <Text style={styles.premiumName}>{item.name}</Text>
                   <Text style={styles.premiumLocation}>{item.location}</Text>
@@ -245,7 +256,8 @@ export default function HomeScreen({ navigation }) {
             </View>
           );
         })}
-      </ScrollView>
+      </Animated.ScrollView>
+
 
 
       {/* Events Carousel */}

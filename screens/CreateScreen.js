@@ -9,7 +9,6 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db, auth, storage } from '../utils/firebaseConfig';
 import GradientButton from '../components/GradientButton';
-import GradientHeader from '../components/GradientHeader';
 
 export default function CreateScreen({ navigation }) {
   const [name, setName] = useState('');

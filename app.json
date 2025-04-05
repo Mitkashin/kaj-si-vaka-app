@@ -1,9 +1,20 @@
 {
   "expo": {
+    "newArchEnabled": true,
+    "android": {
+      "permissions": [
+        "READ_MEDIA_IMAGES", 
+        "READ_EXTERNAL_STORAGE", 
+        "WRITE_EXTERNAL_STORAGE",
+        "CAMERA"
+      ]
+    
+    },
     "name": "KajSiVaka",
     "slug": "KajSiVaka",
     "version": "0.0.1"
-    
   }
+
+
   
 }
