@@ -1,23 +1,11 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import {
-  View, Text, ScrollView, StyleSheet, Image, TouchableOpacity,
-  ActivityIndicator, RefreshControl, TextInput, Platform,  Animated, Dimensions
-} from 'react-native';
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  arrayUnion,
-  arrayRemove
-} from 'firebase/firestore';
-
+import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity, ActivityIndicator, RefreshControl, TextInput, Platform, Animated, Dimensions } from 'react-native';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, } from 'firebase/firestore';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db, auth } from '../utils/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-
 const categories = ['Bars', 'Clubs', 'Live Music', 'Events'];
-
 export default function HomeScreen({ navigation }) {
   const [premiumVenues, setPremiumVenues] = useState([]);
   const [regularVenues, setRegularVenues] = useState([]);
@@ -27,17 +15,15 @@ export default function HomeScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [userDoc, setUserDoc] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [carouselIndex, setCarouselIndex] = useState(0);
 
-  
   const screenWidth = Dimensions.get('window').width;
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef(null);
+  const autoScrollRef = useRef(null);
+  const carouselPosition = useRef(0);
 
   const FadeInImage = ({ uri }) => {
     const fadeAnim = useState(new Animated.Value(0))[0];
-
     return (
       <Animated.Image
         source={{ uri }}
@@ -54,6 +40,7 @@ export default function HomeScreen({ navigation }) {
     );
   };
 
+/// Fetch user document from Firestore
   const fetchUserDoc = async () => {
     const user = auth.currentUser;
     if (!user) return;
@@ -62,10 +49,12 @@ export default function HomeScreen({ navigation }) {
     setUserDoc(snap.data());
   };
 
+/// Fetch user document from Firestore
   useEffect(() => {
     fetchUserDoc();
   }, []);
 
+/// Fetch venues from Firestore
   const fetchVenues = async () => {
     try {
       const snapshot = await getDocs(collection(db, 'venues'));
@@ -77,7 +66,6 @@ export default function HomeScreen({ navigation }) {
         const openB = isVenueOpen(b.openingHours);
         return openA === openB ? 0 : openA ? -1 : 1;
       });
-
       setPremiumVenues(premiums);
       setRegularVenues(sorted);
       setFilteredVenues(sorted);
@@ -86,18 +74,33 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+// Fetch events from Firestore
   useEffect(() => {
     if (premiumVenues.length === 0) return;
-  
-    const interval = setInterval(() => {
-      const nextIndex = (carouselIndex + 1) % premiumVenues.length;
-      scrollRef.current?.scrollTo({ x: nextIndex * (screenWidth * 0.75 + 16), animated: true });
-      setCarouselIndex(nextIndex);
-    }, 4000); // Change slide every 4s
-  
-    return () => clearInterval(interval);
-  }, [carouselIndex, premiumVenues]);
 
+    autoScrollRef.current = setInterval(() => {
+      const nextIndex = (carouselPosition.current + 1) % premiumVenues.length;
+      const xOffset = nextIndex * (screenWidth * 0.75 + 16);
+      scrollRef.current?.scrollTo({ x: xOffset, animated: true });
+      carouselPosition.current = nextIndex;
+    }, 4000);
+    return () => clearInterval(autoScrollRef.current);
+  }, [premiumVenues]);
+
+/// Handle scroll event to update carousel position
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+    {
+      useNativeDriver: false,
+      listener: (event) => {
+        const x = event.nativeEvent.contentOffset.x;
+        const index = Math.round(x / (screenWidth * 0.75 + 16));
+        carouselPosition.current = index;
+      },
+    }
+  );
+
+  /// Fetch events from Firestore
   const fetchEvents = async () => {
     try {
       const todayStr = new Date().toISOString().split('T')[0];
@@ -110,6 +113,7 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  /// Check if venue is open based on opening hours
   const isVenueOpen = (hours) => {
     if (!hours) return false;
     const [start, end] = hours.split('-');
@@ -126,6 +130,7 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  /// Get venue status message based on opening hours
   const getVenueStatus = (hours) => {
     if (!hours) return { open: false, message: 'Unknown' };
     const [start, end] = hours.split('-');
@@ -145,21 +150,23 @@ export default function HomeScreen({ navigation }) {
       const m = minutes % 60;
       return `${h}h ${m}m`;
     };
+    
     let message = isOpen
       ? `🟢 Open • Closes in ${diff(nowMinutes, endMinutes)}`
       : `🔴 Closed • Opens in ${diff(nowMinutes, startMinutes)}`;
     return { open: isOpen, message };
   };
 
+  /// Handle refresh action
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Promise.all([fetchVenues(), fetchEvents()]).finally(() => setRefreshing(false));
   }, []);
-
   useEffect(() => {
     Promise.all([fetchVenues(), fetchEvents()]).finally(() => setLoading(false));
   }, []);
 
+  /// Filter venues based on search query
   useEffect(() => {
     if (searchQuery === '') {
       setFilteredVenues(regularVenues);
@@ -171,21 +178,21 @@ export default function HomeScreen({ navigation }) {
       setFilteredVenues(filtered);
     }
   }, [searchQuery, regularVenues]);
-
   const handleCardPress = (venue) => {
     navigation.navigate('VenueDetails', { venueId: venue.id });
   };
-
   if (loading) {
     return <View style={styles.center}><ActivityIndicator size="large" color="#ee2a7b" /></View>;
   }
-
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
+
+{/* -------------------------------------------------------------------------------------------------------------------- */}
+
       {/* Search Bar */}
       <View style={styles.searchWrapper}>
         <LinearGradient colors={['#f9ce34', '#ee2a7b', '#6228d7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientBorder}>
@@ -206,12 +213,16 @@ export default function HomeScreen({ navigation }) {
         </LinearGradient>
       </View>
 
+{/* -------------------------------------------------------------------------------------------------------------------- */}
+
       {/* Categories */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
         {categories.map((item, index) => (
           <View key={index} style={styles.categoryItem}><Text style={styles.categoryText}>{item}</Text></View>
         ))}
       </ScrollView>
+
+{/* -------------------------------------------------------------------------------------------------------------------- */}
 
       {/* Premium Venue Carousel */}
       {/* Auto-sliding Premium Carousel */}
@@ -222,10 +233,7 @@ export default function HomeScreen({ navigation }) {
         style={styles.carouselScroll}
         scrollEventThrottle={16}
         pagingEnabled={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: false }
-        )}
+        onScroll={handleScroll}
         snapToInterval={screenWidth * 0.75 + 16}
         decelerationRate="fast"
       >
@@ -240,7 +248,6 @@ export default function HomeScreen({ navigation }) {
             });
             fetchUserDoc();
           };
-
           return (
             <View key={item.id} style={[styles.premiumCard, { width: screenWidth * 0.75 }]}>
               <TouchableOpacity style={styles.imageWrapper} onPress={() => handleCardPress(item)}>
@@ -258,6 +265,8 @@ export default function HomeScreen({ navigation }) {
         })}
       </Animated.ScrollView>
 
+
+{/* -------------------------------------------------------------------------------------------------------------------- */}
 
 
       {/* Events Carousel */}
@@ -277,6 +286,10 @@ export default function HomeScreen({ navigation }) {
         </ScrollView>
       </View>
 
+
+{/* -------------------------------------------------------------------------------------------------------------------- */}
+
+
       {/* Venue List */}
       <View style={[styles.venueListWrapper, Platform.OS === 'web' && styles.venueListWeb]}>
         <View style={styles.venueList}>
@@ -284,7 +297,6 @@ export default function HomeScreen({ navigation }) {
             const { open, message } = getVenueStatus(item.openingHours || '');
             const [statusIcon, ...rest] = message.split(' • ');
             const isBookmarked = userDoc?.bookmarkedVenues?.includes(item.id);
-
             const toggleFavorite = async () => {
               try {
                 const user = auth.currentUser;
@@ -292,7 +304,6 @@ export default function HomeScreen({ navigation }) {
                   Alert.alert('Please log in to save favorites.');
                   return;
                 }
-
                 const userRef = doc(db, 'users', user.uid);
                 await updateDoc(userRef, {
                   bookmarkedVenues: isBookmarked
@@ -304,8 +315,6 @@ export default function HomeScreen({ navigation }) {
                 console.error('Failed to toggle favorite:', err);
               }
             };
-
-
             return (
               <TouchableOpacity
                 key={item.id}
@@ -326,7 +335,6 @@ export default function HomeScreen({ navigation }) {
                     />
                   </TouchableOpacity>
                 </View>
-
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={styles.venueName}>{item.name}</Text>
@@ -340,7 +348,6 @@ export default function HomeScreen({ navigation }) {
               </TouchableOpacity>
             );
           })}
-
         </View>
       </View>
     </ScrollView>
@@ -353,135 +360,38 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   searchWrapper: { paddingHorizontal: 16, paddingTop: 12 },
   gradientBorder: { padding: 2, borderRadius: 8 },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-  },
+  searchInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 6, paddingHorizontal: 8, },
   searchInput: { flex: 1, paddingVertical: 8, fontSize: 16 },
   clearIcon: { padding: 4 },
-
   categoryScroll: { paddingVertical: 12, paddingHorizontal: 12 },
-  categoryItem: {
-    backgroundColor: '#f2f2f2',
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    minHeight: 40,
-    justifyContent: 'center',
-  },
+  categoryItem: { backgroundColor: '#f2f2f2', borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10, marginRight: 10, borderWidth: 1, borderColor: '#ddd', minHeight: 40, justifyContent: 'center', },
   categoryText: { fontSize: 15, fontWeight: '600' },
-
   carouselScroll: { paddingHorizontal: 12, paddingBottom: 16 },
-  premiumCard: {
-    width: 280,
-    height: 320,
-    marginRight: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#f5f5f5',
-  },
-  
-  imageWrapper: {
-    flex: 1,
-    position: 'relative',
-  },
-
-  premiumImage: {
-    width: '100%',
-    height: '100%',
-  },
-  
-
-  premiumOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    width: '100%',
-    padding: 10,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-
+  premiumCard: { width: 280, height: 320, marginRight: 16, borderRadius: 12, overflow: 'hidden', backgroundColor: '#f5f5f5', },
+  imageWrapper: { flex: 1, position: 'relative', },
+  premiumImage: { width: '100%', height: '100%', },
+  premiumOverlay: { position: 'absolute', bottom: 0, left: 0, width: '100%', padding: 10, backgroundColor: 'rgba(0,0,0,0.5)', },
   premiumName: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   premiumLocation: { color: '#ccc', fontSize: 12 },
-
   eventsCarouselWrapper: { paddingHorizontal: 16, marginBottom: 16 },
   eventsTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
-  eventCard: {
-    width: 280,
-    height: 200,
-    marginRight: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#f5f5f5',
-  },
+  eventCard: { width: 280, height: 200, marginRight: 16, borderRadius: 12, overflow: 'hidden', backgroundColor: '#f5f5f5', },
   eventImage: { width: '100%', height: '100%' },
-  eventOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    padding: 8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    width: '100%',
-  },
+  eventOverlay: { position: 'absolute', bottom: 0, left: 0, padding: 8, backgroundColor: 'rgba(0,0,0,0.5)', width: '100%', },
   eventName: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
   eventDate: { color: '#ccc', fontSize: 12 },
-
   venueList: { paddingHorizontal: 16 },
-  venueListWrapper: {
-    width: '100%',
-  },
-  venueListWeb: {
-    maxWidth: '50%',
-    alignSelf: 'center',
-  },
-  venueCard: {
-    flexDirection: 'row',
-    padding: 12,
-    marginVertical: 6,
-    borderRadius: 10,
-    backgroundColor: '#fafafa',
-    alignItems: 'center',
-  },
-  
-  venueCardClosed: {
-    backgroundColor: '#eaeaea',
-    opacity: 0.7,
-  },
-  venueImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
-  },
+  venueListWrapper: { width: '100%', },
+  venueListWeb: { maxWidth: '50%', alignSelf: 'center', },
+  venueCard: { flexDirection: 'row', padding: 12, marginVertical: 6, borderRadius: 10, backgroundColor: '#fafafa', alignItems: 'center', },
+  venueCardClosed: { backgroundColor: '#eaeaea', opacity: 0.7, },
+  venueImage: { width: 60, height: 60, borderRadius: 8, marginRight: 12, },
   venueName: { fontWeight: '600', fontSize: 16 },
   venueLocation: { color: '#777', fontSize: 13 },
   openStatus: { fontSize: 12, fontWeight: '600', textAlign: 'right', marginLeft: 10 },
   hoursText: { fontSize: 12, marginTop: 2 },
   open: { color: '#2ecc71' },
   closed: { color: '#e74c3c' },
-
-  heartIconWrapper: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    borderRadius: 20,
-    padding: 4,
-  },
-
-  heartIconPremium: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 2,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 16,
-    padding: 6,
-  },
+  heartIconWrapper: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: 20, padding: 4, },
+  heartIconPremium: { position: 'absolute', top: 10, right: 10, zIndex: 2, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 16, padding: 6, },
 });
