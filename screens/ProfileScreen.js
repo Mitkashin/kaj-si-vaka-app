@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { auth, db } from '../utils/firebaseConfig';
 import {
@@ -141,32 +142,30 @@ export default function ProfileScreen() {
           )}
         </LinearGradient>
 
-        <View style={styles.card}>
-          <Text style={styles.infoLabel}>Phone</Text>
-          <Text style={styles.infoValue}>{userData?.phone || 'Not set'}</Text>
-          <View style={styles.divider} />
-          <Text style={styles.infoLabel}>Joined</Text>
-          <Text style={styles.infoValue}>
-            {userData?.createdAt?.toDate().toLocaleDateString() || 'Unknown'}
-          </Text>
-        </View>
+        <View style={[styles.webWrapper, Platform.OS === 'web' && styles.webLimited]}>
+          <View style={styles.card}>
+            <Text style={styles.infoLabel}>Phone</Text>
+            <Text style={styles.infoValue}>{userData?.phone || 'Not set'}</Text>
+            <View style={styles.divider} />
+            <Text style={styles.infoLabel}>Joined</Text>
+            <Text style={styles.infoValue}>
+              {userData?.createdAt?.toDate().toLocaleDateString() || 'Unknown'}
+            </Text>
+          </View>
 
-        <View style={styles.card}>
-          <Text style={[styles.infoLabel, { marginBottom: 10 }]}>
-            Recent Bookings
-          </Text>
-          {recentBookings.length === 0 ? (
-            <Text style={styles.infoValue}>No bookings yet.</Text>
-          ) : (
-            recentBookings.map((b) => (
-              <View key={b.id} style={styles.bookingRow}>
-                <Text style={styles.bookingVenue}>{b.venueName}</Text>
-                <Text style={styles.bookingDetails}>
-                  {b.date} @ {b.time}
-                </Text>
-              </View>
-            ))
-          )}
+          <View style={styles.card}>
+            <Text style={[styles.infoLabel, { marginBottom: 10 }]}>Recent Bookings</Text>
+            {recentBookings.length === 0 ? (
+              <Text style={styles.infoValue}>No bookings yet.</Text>
+            ) : (
+              recentBookings.map((b) => (
+                <View key={b.id} style={styles.bookingRow}>
+                  <Text style={styles.bookingVenue}>{b.venueName}</Text>
+                  <Text style={styles.bookingDetails}>{b.date} @ {b.time}</Text>
+                </View>
+              ))
+            )}
+          </View>
         </View>
       </ScrollView>
 
@@ -211,6 +210,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  webWrapper: {
+    width: '100%',
+  },
+  webLimited: {
+    maxWidth: '50%',
+    alignSelf: 'center',
   },
   center: {
     flex: 1,

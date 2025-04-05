@@ -1,7 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity, ActivityIndicator, RefreshControl, TextInput } from 'react-native';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../utils/firebaseConfig';
+import {
+  View, Text, ScrollView, StyleSheet, Image, TouchableOpacity,
+  ActivityIndicator, RefreshControl, TextInput, Platform, Animated
+} from 'react-native';
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove
+} from 'firebase/firestore';
+
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db, auth } from '../utils/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -11,9 +22,43 @@ export default function HomeScreen({ navigation }) {
   const [premiumVenues, setPremiumVenues] = useState([]);
   const [regularVenues, setRegularVenues] = useState([]);
   const [filteredVenues, setFilteredVenues] = useState([]);
+  const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [userDoc, setUserDoc] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  const FadeInImage = ({ uri }) => {
+    const fadeAnim = useState(new Animated.Value(0))[0];
+
+    return (
+      <Animated.Image
+        source={{ uri }}
+        style={[styles.premiumImage, { opacity: fadeAnim }]}
+        onLoad={() => {
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }).start();
+        }}
+        resizeMode="cover"
+      />
+    );
+  };
+
+  const fetchUserDoc = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    setCurrentUser(user);
+    const snap = await getDoc(doc(db, 'users', user.uid));
+    setUserDoc(snap.data());
+  };
+
+  useEffect(() => {
+    fetchUserDoc();
+  }, []);
 
   const fetchVenues = async () => {
     try {
@@ -21,19 +66,80 @@ export default function HomeScreen({ navigation }) {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const premiums = data.filter(v => v.isPremium);
       const regulars = data.filter(v => !v.isPremium);
+      const sorted = [...regulars].sort((a, b) => {
+        const openA = isVenueOpen(a.openingHours);
+        const openB = isVenueOpen(b.openingHours);
+        return openA === openB ? 0 : openA ? -1 : 1;
+      });
+
       setPremiumVenues(premiums);
-      setRegularVenues(regulars);
-      setFilteredVenues(regulars);
+      setRegularVenues(sorted);
+      setFilteredVenues(sorted);
     } catch (error) {
       console.error('Error loading venues:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
   };
 
+  const fetchEvents = async () => {
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const q = query(collection(db, 'events'), where('date', '>=', todayStr));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setEvents(data);
+    } catch (error) {
+      console.error('Error loading events:', error);
+    }
+  };
+
+  const isVenueOpen = (hours) => {
+    if (!hours) return false;
+    const [start, end] = hours.split('-');
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    if (endMinutes < startMinutes) {
+      return nowMinutes >= startMinutes || nowMinutes <= endMinutes;
+    } else {
+      return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
+    }
+  };
+
+  const getVenueStatus = (hours) => {
+    if (!hours) return { open: false, message: 'Unknown' };
+    const [start, end] = hours.split('-');
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    let isOpen = endMinutes < startMinutes
+      ? nowMinutes >= startMinutes || nowMinutes < endMinutes
+      : nowMinutes >= startMinutes && nowMinutes < endMinutes;
+    const diff = (a, b) => {
+      let minutes = b - a;
+      if (minutes < 0) minutes += 1440;
+      const h = Math.floor(minutes / 60);
+      const m = minutes % 60;
+      return `${h}h ${m}m`;
+    };
+    let message = isOpen
+      ? `🟢 Open • Closes in ${diff(nowMinutes, endMinutes)}`
+      : `🔴 Closed • Opens in ${diff(nowMinutes, startMinutes)}`;
+    return { open: isOpen, message };
+  };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    Promise.all([fetchVenues(), fetchEvents()]).finally(() => setRefreshing(false));
+  }, []);
+
   useEffect(() => {
-    fetchVenues();
+    Promise.all([fetchVenues(), fetchEvents()]).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -41,26 +147,19 @@ export default function HomeScreen({ navigation }) {
       setFilteredVenues(regularVenues);
     } else {
       const lower = searchQuery.toLowerCase();
-      const filtered = regularVenues.filter(v => v.name.toLowerCase().includes(lower) || v.location.toLowerCase().includes(lower));
+      const filtered = regularVenues.filter(v =>
+        v.name.toLowerCase().includes(lower) || v.location.toLowerCase().includes(lower)
+      );
       setFilteredVenues(filtered);
     }
   }, [searchQuery, regularVenues]);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchVenues();
-  }, []);
 
   const handleCardPress = (venue) => {
     navigation.navigate('VenueDetails', { venueId: venue.id });
   };
 
   if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#ee2a7b" />
-      </View>
-    );
+    return <View style={styles.center}><ActivityIndicator size="large" color="#ee2a7b" /></View>;
   }
 
   return (
@@ -71,12 +170,7 @@ export default function HomeScreen({ navigation }) {
     >
       {/* Search Bar */}
       <View style={styles.searchWrapper}>
-        <LinearGradient
-          colors={['#f9ce34', '#ee2a7b', '#6228d7']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.gradientBorder}
-        >
+        <LinearGradient colors={['#f9ce34', '#ee2a7b', '#6228d7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientBorder}>
           <View style={styles.searchInputContainer}>
             <TextInput
               placeholder="Search venues..."
@@ -97,36 +191,145 @@ export default function HomeScreen({ navigation }) {
       {/* Categories */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
         {categories.map((item, index) => (
-          <View key={index} style={styles.categoryItem}>
-            <Text style={styles.categoryText}>{item}</Text>
-          </View>
+          <View key={index} style={styles.categoryItem}><Text style={styles.categoryText}>{item}</Text></View>
         ))}
       </ScrollView>
 
       {/* Premium Venue Carousel */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.carouselScroll}>
-        {premiumVenues.map((item) => (
-          <TouchableOpacity key={item.id} style={styles.premiumCard} onPress={() => handleCardPress(item)}>
-            <Image source={{ uri: item.imageUrl }} style={styles.premiumImage} />
-            <View style={styles.premiumOverlay}>
-              <Text style={styles.premiumName}>{item.name}</Text>
-              <Text style={styles.premiumLocation}>{item.location}</Text>
+        {premiumVenues.map((item) => {
+          const isBookmarked = userDoc?.bookmarkedVenues?.includes(item.id);
+
+          const toggleFavorite = async () => {
+            try {
+              const user = auth.currentUser;
+              if (!user) {
+                Alert.alert('Please log in to save favorites.');
+                return;
+              }
+
+              const userRef = doc(db, 'users', user.uid);
+              await updateDoc(userRef, {
+                bookmarkedVenues: isBookmarked
+                  ? arrayRemove(item.id)
+                  : arrayUnion(item.id),
+              });
+
+              fetchUserDoc(); // refresh
+            } catch (err) {
+              console.error('Error toggling favorite:', err);
+            }
+          };
+
+          return (
+            <View key={item.id} style={styles.premiumCard}>
+              <TouchableOpacity style={styles.imageWrapper} onPress={() => handleCardPress(item)}>
+              <FadeInImage 
+                  uri={item.imageUrl}
+                  resizeMode="cover"
+                />
+
+                <TouchableOpacity onPress={toggleFavorite} style={styles.heartIconPremium}>
+                  <Ionicons
+                    name={isBookmarked ? 'heart' : 'heart-outline'}
+                    size={22}
+                    color={isBookmarked ? '#ee2a7b' : '#444'}
+                  />
+                </TouchableOpacity>
+
+                <View style={styles.premiumOverlay}>
+                  <Text style={styles.premiumName}>{item.name}</Text>
+                  <Text style={styles.premiumLocation}>{item.location}</Text>
+                </View>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        ))}
+          );
+        })}
       </ScrollView>
 
+
+      {/* Events Carousel */}
+      <View style={styles.eventsCarouselWrapper}>
+        <Text style={styles.eventsTitle}>Upcoming Events</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {events.map(event => (
+            <TouchableOpacity key={event.id} style={styles.eventCard} onPress={() => navigation.navigate('EventDetails', { eventId: event.id })}>
+              <FadeInImage uri={event.imageUrl} />
+
+              <View style={styles.eventOverlay}>
+                <Text style={styles.eventName}>{event.name}</Text>
+                <Text style={styles.eventDate}>{event.date} @ {event.time}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       {/* Venue List */}
-      <View style={styles.venueList}>
-        {filteredVenues.map((item) => (
-          <TouchableOpacity key={item.id} style={styles.venueCard} onPress={() => handleCardPress(item)}>
-            <Image source={{ uri: item.imageUrl }} style={styles.venueImage} />
-            <View>
-              <Text style={styles.venueName}>{item.name}</Text>
-              <Text style={styles.venueLocation}>{item.location}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+      <View style={[styles.venueListWrapper, Platform.OS === 'web' && styles.venueListWeb]}>
+        <View style={styles.venueList}>
+          {filteredVenues.map((item) => {
+            const { open, message } = getVenueStatus(item.openingHours || '');
+            const [statusIcon, ...rest] = message.split(' • ');
+            const isBookmarked = userDoc?.bookmarkedVenues?.includes(item.id);
+
+            const toggleFavorite = async () => {
+              try {
+                const user = auth.currentUser;
+                if (!user) {
+                  Alert.alert('Please log in to save favorites.');
+                  return;
+                }
+
+                const userRef = doc(db, 'users', user.uid);
+                await updateDoc(userRef, {
+                  bookmarkedVenues: isBookmarked
+                    ? arrayRemove(item.id)
+                    : arrayUnion(item.id),
+                });
+                fetchUserDoc(); // Refresh local state
+              } catch (err) {
+                console.error('Failed to toggle favorite:', err);
+              }
+            };
+
+
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.venueCard, !open && styles.venueCardClosed]}
+                onPress={() => handleCardPress(item)}
+              >
+                <View style={{ position: 'relative' }}>
+                  <Image source={{ uri: item.imageUrl }} style={styles.venueImage} />
+
+                  <TouchableOpacity
+                    onPress={toggleFavorite}
+                    style={styles.heartIconWrapper}
+                  >
+                    <Ionicons
+                      name={isBookmarked ? 'heart' : 'heart-outline'}
+                      size={20}
+                      color={isBookmarked ? '#ee2a7b' : '#666'}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={styles.venueName}>{item.name}</Text>
+                    <View style={{ alignItems: 'flex-end', maxWidth: 140 }}>
+                      <Text style={[styles.openStatus, open ? styles.open : styles.closed]}>{statusIcon}</Text>
+                      <Text style={[styles.hoursText, open ? styles.open : styles.closed]}>{rest.join(' • ')}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.venueLocation}>{item.location}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+        </View>
       </View>
     </ScrollView>
   );
@@ -135,14 +338,9 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   scrollContent: { paddingBottom: 100 },
-  searchWrapper: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  gradientBorder: {
-    padding: 2,
-    borderRadius: 8,
-  },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  searchWrapper: { paddingHorizontal: 16, paddingTop: 12 },
+  gradientBorder: { padding: 2, borderRadius: 8 },
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -150,19 +348,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
   },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    fontSize: 16,
-  },
-  clearIcon: {
-    padding: 4,
-  },
-  categoryScroll: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-  },
+  searchInput: { flex: 1, paddingVertical: 8, fontSize: 16 },
+  clearIcon: { padding: 4 },
+
+  categoryScroll: { paddingVertical: 12, paddingHorizontal: 12 },
   categoryItem: {
     backgroundColor: '#f2f2f2',
     borderRadius: 20,
@@ -174,60 +363,83 @@ const styles = StyleSheet.create({
     minHeight: 40,
     justifyContent: 'center',
   },
-  categoryText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  carouselScroll: {
-    paddingHorizontal: 12,
-    paddingBottom: 20,
-  },
+  categoryText: { fontSize: 15, fontWeight: '600' },
+
+  carouselScroll: { paddingHorizontal: 12, paddingBottom: 16 },
   premiumCard: {
     width: 280,
     height: 320,
     marginRight: 16,
     borderRadius: 12,
     overflow: 'hidden',
+    backgroundColor: '#f5f5f5',
+  },
+  
+  imageWrapper: {
+    flex: 1,
     position: 'relative',
   },
+
   premiumImage: {
     width: '100%',
     height: '100%',
   },
+  
+
   premiumOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
+    width: '100%',
     padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+
+  premiumName: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  premiumLocation: { color: '#ccc', fontSize: 12 },
+
+  eventsCarouselWrapper: { paddingHorizontal: 16, marginBottom: 16 },
+  eventsTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
+  eventCard: {
+    width: 280,
+    height: 200,
+    marginRight: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#f5f5f5',
+  },
+  eventImage: { width: '100%', height: '100%' },
+  eventOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    padding: 8,
     backgroundColor: 'rgba(0,0,0,0.5)',
     width: '100%',
   },
-  premiumName: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+  eventName: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  eventDate: { color: '#ccc', fontSize: 12 },
+
+  venueList: { paddingHorizontal: 16 },
+  venueListWrapper: {
+    width: '100%',
   },
-  premiumLocation: {
-    color: '#ccc',
-    fontSize: 12,
-  },
-  venueList: {
-    maxWidth: 500,
-    paddingBottom: 80,
-    paddingHorizontal: 16,
+  venueListWeb: {
+    maxWidth: '50%',
+    alignSelf: 'center',
   },
   venueCard: {
     flexDirection: 'row',
     padding: 12,
     marginVertical: 6,
-    backgroundColor: '#fafafa',
     borderRadius: 10,
+    backgroundColor: '#fafafa',
     alignItems: 'center',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 4,
+  },
+  
+  venueCardClosed: {
+    backgroundColor: '#eaeaea',
+    opacity: 0.7,
   },
   venueImage: {
     width: 60,
@@ -237,4 +449,27 @@ const styles = StyleSheet.create({
   },
   venueName: { fontWeight: '600', fontSize: 16 },
   venueLocation: { color: '#777', fontSize: 13 },
+  openStatus: { fontSize: 12, fontWeight: '600', textAlign: 'right', marginLeft: 10 },
+  hoursText: { fontSize: 12, marginTop: 2 },
+  open: { color: '#2ecc71' },
+  closed: { color: '#e74c3c' },
+
+  heartIconWrapper: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    borderRadius: 20,
+    padding: 4,
+  },
+
+  heartIconPremium: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 2,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 16,
+    padding: 6,
+  },
 });

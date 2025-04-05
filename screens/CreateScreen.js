@@ -1,233 +1,308 @@
-import React from 'react';
-import { View, Text } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View, Text, TextInput, StyleSheet, TouchableOpacity,
+  Image, Platform, Alert, ActivityIndicator
+} from 'react-native';
+import { addDoc, collection, getDoc, getDocs, doc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { db, auth, storage } from '../utils/firebaseConfig';
 import GradientButton from '../components/GradientButton';
-import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../utils/firebaseConfig'; // adjust path
+import GradientHeader from '../components/GradientHeader';
 
+export default function CreateScreen({ navigation }) {
+  const [name, setName] = useState('');
+  const [location, setLocation] = useState('');
+  const [date, setDate] = useState(new Date());
+  const [time, setTime] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [image, setImage] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [venues, setVenues] = useState([]);
+  const [selectedVenueId, setSelectedVenueId] = useState('');
+  const [loadingVenues, setLoadingVenues] = useState(true);
 
-//Random Image
-// https://picsum.photos/600/400?random=1
-const venues = [
-  {
-    name: "Neon Nights",
-    location: "Downtown",
-    description: "Trendy nightclub with live DJs and a vibrant dancefloor.",
-    openingHours: "21:00 - 04:00",
-    rating: 4.8,
-    isPremium: true,
-    imageUrl: "https://picsum.photos/600/400?random=1",
-    amenities: ["Live DJ", "Cocktails", "Smoking Area", "WiFi"]
-  },
-  {
-    name: "Sky Lounge",
-    location: "Rooftop, City Center",
-    description: "Stylish rooftop bar with panoramic views and chill vibes.",
-    openingHours: "18:00 - 02:00",
-    rating: 4.9,
-    isPremium: true,
-    imageUrl: "https://picsum.photos/600/400?random=2",
-    amenities: ["Rooftop", "Lounge Seating", "Live Music", "Hookah"]
-  },
-  {
-    name: "The Whiskey Den",
-    location: "Old Town",
-    description: "Rustic pub with rare whiskeys, wooden decor, and a cozy atmosphere.",
-    openingHours: "16:00 - 01:00",
-    rating: 4.5,
-    isPremium: false,
-    imageUrl: "https://picsum.photos/600/400?random=3",
-    amenities: ["Whiskey Selection", "WiFi", "Craft Beer"]
-  },
-  {
-    name: "Urban Vibe",
-    location: "Main Street",
-    description: "Chic venue for dance parties, cocktails, and city nightlife.",
-    openingHours: "20:00 - 03:00",
-    rating: 4.6,
-    isPremium: false,
-    imageUrl: "https://picsum.photos/600/400?random=4",
-    amenities: ["Dance Floor", "Cocktails", "Live DJ"]
-  },
-  {
-    name: "Café Urban",
-    location: "Midtown",
-    description: "Modern café perfect for hangouts, open mic nights, and cozy chats.",
-    openingHours: "08:00 - 22:00",
-    rating: 4.4,
-    isPremium: false,
-    imageUrl: "https://picsum.photos/600/400?random=5",
-    amenities: ["WiFi", "Outdoor Seating", "Live Music"]
-  },
-  {
-    name: "Velvet Underground",
-    location: "Underground Station",
-    description: "An artsy hidden bar known for underground music and dim lighting.",
-    openingHours: "19:00 - 03:00",
-    rating: 4.7,
-    isPremium: true,
-    imageUrl: "https://picsum.photos/600/400?random=6",
-    amenities: ["Live DJ", "Craft Cocktails", "Artsy Vibes"]
-  },
-  {
-    name: "The Garden Terrace",
-    location: "Riverbank",
-    description: "Open-air lounge surrounded by plants, perfect for summer nights.",
-    openingHours: "17:00 - 01:00",
-    rating: 4.5,
-    isPremium: false,
-    imageUrl: "https://picsum.photos/600/400?random=7",
-    amenities: ["Outdoor Seating", "Cocktails", "Romantic Lighting"]
-  },
-  {
-    name: "Pulse Club",
-    location: "Nightlife District",
-    description: "High-energy dance club with multiple rooms and laser lights.",
-    openingHours: "22:00 - 05:00",
-    rating: 4.6,
-    isPremium: true,
-    imageUrl: "https://picsum.photos/600/400?random=8",
-    amenities: ["Live DJ", "Laser Show", "VIP Area"]
-  },
-  {
-    name: "Tiki Bar Paradise",
-    location: "Beachfront",
-    description: "Tropical-themed bar with exotic drinks and beach vibes.",
-    openingHours: "14:00 - 00:00",
-    rating: 4.3,
-    isPremium: false,
-    imageUrl: "https://picsum.photos/600/400?random=9",
-    amenities: ["Tropical Drinks", "Beach View", "WiFi"]
-  },
-  {
-    name: "Jazz & Soul",
-    location: "Cultural District",
-    description: "Intimate venue for jazz lovers and soulful nights.",
-    openingHours: "19:00 - 23:30",
-    rating: 4.9,
-    isPremium: true,
-    imageUrl: "https://picsum.photos/600/400?random=10",
-    amenities: ["Live Jazz", "Cocktail Bar", "Seating"]
-  },
-  {
-    name: "The Basement",
-    location: "Lower East Side",
-    description: "Dark, edgy club known for electronic beats and underground vibes.",
-    openingHours: "22:00 - 04:00",
-    rating: 4.4,
-    isPremium: false,
-    imageUrl: "https://picsum.photos/600/400?random=11",
-    amenities: ["Live DJ", "Dark Theme", "Hookah"]
-  },
-  {
-    name: "Luxe Lounge",
-    location: "High Street",
-    description: "Elegant cocktail lounge with plush seating and upscale ambiance.",
-    openingHours: "17:00 - 02:00",
-    rating: 4.8,
-    isPremium: true,
-    imageUrl: "https://picsum.photos/600/400?random=12",
-    amenities: ["Premium Cocktails", "VIP Seating", "Waiter Service"]
-  },
-  {
-    name: "Karaoke House",
-    location: "Central Plaza",
-    description: "Fun and casual spot for karaoke and group parties.",
-    openingHours: "18:00 - 01:00",
-    rating: 4.2,
-    isPremium: false,
-    imageUrl: "https://picsum.photos/600/400?random=13",
-    amenities: ["Karaoke", "Private Rooms", "Happy Hour"]
-  },
-  {
-    name: "Vino Veritas",
-    location: "Wine Valley",
-    description: "Classy wine bar with sommelier picks and tapas.",
-    openingHours: "15:00 - 23:00",
-    rating: 4.7,
-    isPremium: true,
-    imageUrl: "https://picsum.photos/600/400?random=14",
-    amenities: ["Wine Selection", "Tapas", "Outdoor Seating"]
-  },
-  {
-    name: "Electric Avenue",
-    location: "Downtown Strip",
-    description: "Electro house club with international guest DJs every weekend.",
-    openingHours: "22:00 - 05:00",
-    rating: 4.6,
-    isPremium: true,
-    imageUrl: "https://picsum.photos/600/400?random=15",
-    amenities: ["Guest DJs", "VIP Area", "Laser Show"]
-  },
-  {
-    name: "Boardwalk Pub",
-    location: "Boardwalk",
-    description: "Laid-back seaside pub with craft beers and a local crowd.",
-    openingHours: "13:00 - 00:00",
-    rating: 4.3,
-    isPremium: false,
-    imageUrl: "https://picsum.photos/600/400?random=16",
-    amenities: ["Craft Beer", "Seaside View", "TV Sports"]
-  },
-  {
-    name: "The Craft Room",
-    location: "Artisan District",
-    description: "Experimental bar with mixology nights and DIY cocktail kits.",
-    openingHours: "18:00 - 01:00",
-    rating: 4.5,
-    isPremium: false,
-    imageUrl: "https://picsum.photos/600/400?random=17",
-    amenities: ["Mixology", "Unique Drinks", "Workshops"]
-  },
-  {
-    name: "Hidden Speakeasy",
-    location: "Back Alley",
-    description: "Secret bar with password-only access and 1920s vibes.",
-    openingHours: "20:00 - 02:00",
-    rating: 4.9,
-    isPremium: true,
-    imageUrl: "https://picsum.photos/600/400?random=18",
-    amenities: ["Hidden Entry", "Prohibition Cocktails", "Jazz Music"]
-  },
-  {
-    name: "The Chill Spot",
-    location: "College Area",
-    description: "Budget-friendly bar with pool tables, darts, and chill beats.",
-    openingHours: "16:00 - 01:00",
-    rating: 4.1,
-    isPremium: false,
-    imageUrl: "https://picsum.photos/600/400?random=19",
-    amenities: ["Pool Tables", "Affordable Drinks", "WiFi"]
-  },
-  {
-    name: "Boho Breeze",
-    location: "Art District",
-    description: "Laid-back open-air bar with hammocks and chill beats.",
-    openingHours: "17:00 - 23:30",
-    rating: 4.4,
-    isPremium: false,
-    imageUrl: "https://picsum.photos/600/400?random=20",
-    amenities: ["Hammocks", "Outdoor Bar", "Acoustic Nights"]
-  }
-];
+  useEffect(() => {
+    const fetchVenues = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
 
+        const userSnap = await getDoc(doc(db, 'users', user.uid));
+        const userData = userSnap.data();
+        const venueIds = userData?.venueIds || [];
 
-export default function CreateScreen() {
-  const handleCreateEvent = async () => {
-    try {
-      venues.forEach(async (venue) => {
-        await addDoc(collection(db, 'venues'), venue);
-      });
-      alert('Event Created!');
-    } catch (error) {
-      console.error('Error creating event:', error);
-      alert('Failed to create event.');
+        const venueSnap = await getDocs(collection(db, 'venues'));
+        const allVenues = venueSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const ownedVenues = allVenues.filter(v => venueIds.includes(v.id));
+
+        setVenues(ownedVenues);
+      } catch (error) {
+        console.error("Failed to load venues:", error);
+      } finally {
+        setLoadingVenues(false);
+      }
+    };
+
+    fetchVenues();
+  }, []);
+
+  const pickImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert("Permission required", "You need to allow photo access to upload an image.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0]);
     }
   };
 
+  const handleCreate = async () => {
+    if (!name || !location || !date || !time) {
+      Alert.alert("Missing fields", "Please fill all required fields.");
+      return;
+    }
+
+    setUploading(true);
+
+    let imageUrl = '';
+    if (image?.uri) {
+      try {
+        const response = await fetch(image.uri);
+        const blob = await response.blob();
+        const filename = `events/${Date.now()}_${auth.currentUser?.uid || 'anon'}.jpg`;
+        const imageRef = ref(storage, filename);
+        await uploadBytes(imageRef, blob);
+        imageUrl = await getDownloadURL(imageRef);
+      } catch (err) {
+        console.error('Image upload failed:', err);
+        Alert.alert("Upload failed", "Couldn't upload image.");
+        setUploading(false);
+        return;
+      }
+    }
+
+    try {
+      const newEvent = {
+        name,
+        location,
+        date: date.toISOString().split('T')[0],
+        time: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        imageUrl,
+        createdBy: auth.currentUser?.email || 'anonymous',
+        createdAt: serverTimestamp(),
+      };
+
+      if (selectedVenueId) {
+        newEvent.venueId = selectedVenueId;
+      }
+
+      await addDoc(collection(db, 'events'), newEvent);
+
+      Alert.alert("Event created");
+      setName('');
+      setLocation('');
+      setDate(new Date());
+      setTime(new Date());
+      setImage(null);
+      setSelectedVenueId('');
+    } catch (error) {
+      console.error('Error creating event:', error);
+      Alert.alert("Error", "Couldn't create event.");
+    }
+
+    setUploading(false);
+  };
+
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <GradientButton title="Create Event" onPress={handleCreateEvent} />
+    <View style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <Text style={styles.label}>Event Name</Text>
+        <TextInput value={name} onChangeText={setName} style={styles.input} placeholder="Name" />
+
+        <Text style={styles.label}>Location</Text>
+        <TextInput
+          value={location}
+          onChangeText={setLocation}
+          style={styles.input}
+          placeholder="Location"
+          editable={!selectedVenueId}
+        />
+
+        <Text style={styles.label}>Date</Text>
+        {Platform.OS === 'web' ? (
+          <input
+            type="date"
+            className="webInputFix"
+            value={date.toISOString().split('T')[0]}
+            onChange={(e) => setDate(new Date(e.target.value))}
+            style={styles.webInput}
+          />
+        ) : (
+          <>
+            <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.input}>
+              <Text>{date.toDateString()}</Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                mode="date"
+                value={date}
+                onChange={(e, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (selectedDate) setDate(selectedDate);
+                }}
+              />
+            )}
+          </>
+        )}
+
+        <Text style={styles.label}>Time</Text>
+        {Platform.OS === 'web' ? (
+          <input
+            type="time"
+            className="webInputFix"
+            value={time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            onChange={(e) => {
+              const [h, m] = e.target.value.split(':').map(Number);
+              const newTime = new Date();
+              newTime.setHours(h);
+              newTime.setMinutes(m);
+              setTime(newTime);
+            }}
+            style={styles.webInput}
+          />
+        ) : (
+          <>
+            <TouchableOpacity onPress={() => setShowTimePicker(true)} style={styles.input}>
+              <Text>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+            </TouchableOpacity>
+            {showTimePicker && (
+              <DateTimePicker
+                mode="time"
+                value={time}
+                is24Hour={true}
+                display="default"
+                onChange={(e, selectedTime) => {
+                  setShowTimePicker(false);
+                  if (selectedTime) setTime(selectedTime);
+                }}
+              />
+            )}
+          </>
+        )}
+
+        <Text style={styles.label}>Pick a Venue (optional)</Text>
+        {loadingVenues ? (
+          <ActivityIndicator size="small" color="#ee2a7b" />
+        ) : venues.length === 0 ? (
+          <Text style={{ fontStyle: 'italic', color: '#666', marginBottom: 12 }}>No venues linked to your account.</Text>
+        ) : (
+          venues.map((venue) => {
+            const isSelected = selectedVenueId === venue.id;
+            return (
+              <TouchableOpacity
+                key={venue.id}
+                onPress={() => {
+                  if (isSelected) {
+                    setSelectedVenueId('');
+                    setLocation('');
+                  } else {
+                    setSelectedVenueId(venue.id);
+                    setLocation(venue.location || '');
+                  }
+                }}
+                style={[
+                  styles.venueOption,
+                  isSelected && styles.venueSelected
+                ]}
+              >
+                <Text style={{ fontWeight: '500' }}>{venue.name}</Text>
+                <Text style={{ fontSize: 12, color: '#666' }}>{venue.location}</Text>
+              </TouchableOpacity>
+            );
+          })
+        )}
+
+        <Text style={styles.label}>Event Image</Text>
+        {image && (
+          <Image
+            source={{ uri: image.uri }}
+            style={{ width: '100%', height: 200, borderRadius: 8, marginBottom: 12 }}
+            resizeMode="cover"
+          />
+        )}
+        <TouchableOpacity style={styles.uploadBtn} onPress={pickImage}>
+          <Text style={styles.uploadBtnText}>Pick Image</Text>
+        </TouchableOpacity>
+
+        <View style={{ marginTop: 24 }}>
+          <GradientButton
+            title={uploading ? 'Creating...' : 'Create Event'}
+            onPress={handleCreate}
+            disabled={uploading}
+          />
+        </View>
+      </View>
     </View>
   );
 }
 
+const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+    width: '100%',
+    ...(Platform.OS === 'web' && {
+      maxWidth: '50%',
+      alignSelf: 'center',
+    }),
+  },
+  label: { marginTop: 12, fontSize: 16, fontWeight: '600' },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 10,
+    borderRadius: 6,
+    marginTop: 6,
+  },
+  uploadBtn: {
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#6228d7',
+    alignItems: 'center',
+  },
+  uploadBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  venueOption: {
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    marginTop: 8,
+  },
+  venueSelected: {
+    borderColor: '#ee2a7b',
+    backgroundColor: '#fef1f8',
+  },
+  webInput: {
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginTop: 6,
+    width: '100%',
+    fontSize: 16,
+    boxSizing: 'border-box',
+  },
+});
