@@ -123,7 +123,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 180 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <LinearGradient
           colors={['#f9ce34', '#ee2a7b', '#6228d7']}
           style={styles.header}
@@ -166,16 +166,14 @@ export default function ProfileScreen() {
               ))
             )}
           </View>
+
+          {/* Moved Buttons Here */}
+          <View style={{ marginHorizontal: 20, marginBottom: 30, gap: 12 }}>
+            <GradientButton title="Edit Profile" onPress={() => setEditModalVisible(true)} />
+            <GradientButton title="Sign Out" onPress={handleSignOut} />
+          </View>
         </View>
       </ScrollView>
-
-      {/* Bottom Buttons */}
-      <View style={styles.footerButtons}>
-        <View style={styles.buttonWrapper}>
-          <GradientButton title="Edit Profile" onPress={() => setEditModalVisible(true)} />
-          <GradientButton title="Sign Out" onPress={handleSignOut} />
-        </View>
-      </View>
 
       {/* Edit Profile Modal */}
       <Modal visible={editModalVisible} transparent animationType="slide">
@@ -294,19 +292,6 @@ const styles = StyleSheet.create({
   bookingDetails: {
     fontSize: 14,
     color: '#666',
-  },
-  footerButtons: {
-    position: 'absolute',
-    bottom: 30,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  buttonWrapper: {
-    width: '100%',
-    maxWidth: 400,
-    paddingHorizontal: 20,
-    gap: 12,
   },
   modalOverlay: {
     flex: 1,
