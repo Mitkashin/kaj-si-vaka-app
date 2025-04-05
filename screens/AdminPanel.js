@@ -8,6 +8,7 @@ import {
   Alert,
   TouchableOpacity,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -131,165 +132,173 @@ export default function AdminPanel({ navigation }) {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      {/* STATS */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>Users</Text>
-          <Text style={styles.statValue}>{totalUsers}</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>Venues</Text>
-          <Text style={styles.statValue}>{totalVenues}</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>Bookings</Text>
-          <Text style={styles.statValue}>{totalBookings}</Text>
-        </View>
-      </View>
-
-      {/* RECENT BOOKINGS */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Bookings</Text>
-        {recentBookings.map((booking, index) => (
-          <View
-            key={booking.id}
-            style={[
-              styles.bookingRow,
-              index % 2 === 0 ? styles.venueEven : styles.venueOdd,
-            ]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.bookingVenue}>{booking.venueName}</Text>
-              <Text style={styles.bookingDetails}>
-                {booking.userName || 'Unknown'} ({booking.userEmail || 'No email'})
-              </Text>
-              <Text style={styles.bookingDetails}>
-                {booking.date} @ {booking.time}
-              </Text>
-            </View>
+    <View style={[styles.container, Platform.OS === 'web' && styles.webLimited]}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* STATS */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>Users</Text>
+            <Text style={styles.statValue}>{totalUsers}</Text>
           </View>
-        ))}
-        <View style={styles.centeredButton}>
-          <GradientButton
-            title="View All"
-            onPress={() => navigation.navigate('AllBookings')}
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>Venues</Text>
+            <Text style={styles.statValue}>{totalVenues}</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>Bookings</Text>
+            <Text style={styles.statValue}>{totalBookings}</Text>
+          </View>
+        </View>
+
+        {/* RECENT BOOKINGS */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Bookings</Text>
+          {recentBookings.map((booking, index) => (
+            <View
+              key={booking.id}
+              style={[
+                styles.bookingRow,
+                index % 2 === 0 ? styles.venueEven : styles.venueOdd,
+              ]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bookingVenue}>{booking.venueName}</Text>
+                <Text style={styles.bookingDetails}>
+                  {booking.userName || 'Unknown'} ({booking.userEmail || 'No email'})
+                </Text>
+                <Text style={styles.bookingDetails}>
+                  {booking.date} @ {booking.time}
+                </Text>
+              </View>
+            </View>
+          ))}
+          <View style={styles.centeredButton}>
+            <GradientButton
+              title="View All"
+              onPress={() => navigation.navigate('AllBookings')}
+            />
+          </View>
+        </View>
+
+        {/* TOP VENUES */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔥 Top Booked Venues</Text>
+          {venueBookingCounts.map((item, index) => (
+            <View key={index} style={styles.topListItem}>
+              <Text style={styles.topListText}>
+                {index + 1}. {item.venueName}
+              </Text>
+              <Text style={styles.topListText}>{item.count}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* USER MANAGEMENT */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>User Management</Text>
+          <FlatList
+            data={users}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
+            renderItem={({ item }) => (
+              <View style={styles.card}>
+                <Text style={styles.email}>
+                  {item.username ? `${item.username} - ${item.email}` : item.email}
+                </Text>
+
+                <Text style={styles.label}>Role:</Text>
+                <View style={styles.dropdownRow}>
+                  {['user', 'owner', 'admin'].map((roleOption) => (
+                    <TouchableOpacity
+                      key={roleOption}
+                      onPress={() => updateUser(item.id, { role: roleOption })}
+                      style={[
+                        styles.roleButton,
+                        item.role === roleOption && styles.roleButtonActive,
+                      ]}
+                    >
+                      <Text
+                        style={{
+                          color: item.role === roleOption ? '#fff' : '#333',
+                          fontWeight: '600',
+                        }}
+                      >
+                        {roleOption}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <TouchableOpacity
+                  onPress={() =>
+                    setExpandedUserId(expandedUserId === item.id ? null : item.id)
+                  }
+                  style={styles.toggleButton}
+                >
+                  <Ionicons
+                    name={expandedUserId === item.id ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color="#333"
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={styles.toggleText}>
+                    {expandedUserId === item.id ? 'Hide Venues' : 'Show Venues'}
+                  </Text>
+                </TouchableOpacity>
+
+                {expandedUserId === item.id && (
+                  <>
+                    <Text style={styles.label}>Owns Venues:</Text>
+                    {venues.map((venue, index) => {
+                      const ownsVenue = item.venueIds?.includes(venue.id);
+                      const isEven = index % 2 === 0;
+                      return (
+                        <View
+  key={venue.id}
+  style={[
+    styles.venueRow,
+    isEven ? styles.venueEven : styles.venueOdd,
+  ]}
+>
+                          <Text style={styles.venueName}>{venue.name}</Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              const updated = ownsVenue
+                                ? item.venueIds.filter((id) => id !== venue.id)
+                                : [...(item.venueIds || []), venue.id];
+                              updateUser(item.id, { venueIds: updated });
+                            }}
+                            style={[
+                              styles.venueButton,
+                              ownsVenue && styles.venueButtonActive,
+                            ]}
+                          >
+                            <Text style={{ color: ownsVenue ? '#fff' : '#333' }}>
+                              {ownsVenue ? '✓ Remove' : 'Add'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
+                  </>
+                )}
+              </View>
+            )}
           />
         </View>
-      </View>
-
-      {/* TOP VENUES */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🔥 Top Booked Venues</Text>
-        {venueBookingCounts.map((item, index) => (
-          <View key={index} style={styles.topListItem}>
-            <Text style={styles.topListText}>
-              {index + 1}. {item.venueName}
-            </Text>
-            <Text style={styles.topListText}>{item.count}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* USER MANAGEMENT */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>User Management</Text>
-        <FlatList
-          data={users}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <Text style={styles.email}>
-                {item.username ? `${item.username} - ${item.email}` : item.email}
-              </Text>
-
-              <Text style={styles.label}>Role:</Text>
-              <View style={styles.dropdownRow}>
-                {['user', 'owner', 'admin'].map((roleOption) => (
-                  <TouchableOpacity
-                    key={roleOption}
-                    onPress={() => updateUser(item.id, { role: roleOption })}
-                    style={[
-                      styles.roleButton,
-                      item.role === roleOption && styles.roleButtonActive,
-                    ]}
-                  >
-                    <Text
-                      style={{
-                        color: item.role === roleOption ? '#fff' : '#333',
-                        fontWeight: '600',
-                      }}
-                    >
-                      {roleOption}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <TouchableOpacity
-                onPress={() =>
-                  setExpandedUserId(expandedUserId === item.id ? null : item.id)
-                }
-                style={styles.toggleButton}
-              >
-                <Ionicons
-                  name={expandedUserId === item.id ? 'chevron-up' : 'chevron-down'}
-                  size={18}
-                  color="#333"
-                  style={{ marginRight: 6 }}
-                />
-                <Text style={styles.toggleText}>
-                  {expandedUserId === item.id ? 'Hide Venues' : 'Show Venues'}
-                </Text>
-              </TouchableOpacity>
-
-              {expandedUserId === item.id && (
-                <>
-                  <Text style={styles.label}>Owns Venues:</Text>
-                  {venues.map((venue, index) => {
-                    const ownsVenue = item.venueIds?.includes(venue.id);
-                    const isEven = index % 2 === 0;
-                    return (
-                      <View
-                        key={venue.id}
-                        style={[
-                          styles.venueRow,
-                          isEven ? styles.venueEven : styles.venueOdd,
-                        ]}
-                      >
-                        <Text style={styles.venueName}>{venue.name}</Text>
-                        <TouchableOpacity
-                          onPress={() => {
-                            const updated = ownsVenue
-                              ? item.venueIds.filter((id) => id !== venue.id)
-                              : [...(item.venueIds || []), venue.id];
-                            updateUser(item.id, { venueIds: updated });
-                          }}
-                          style={[
-                            styles.venueButton,
-                            ownsVenue && styles.venueButtonActive,
-                          ]}
-                        >
-                          <Text style={{ color: ownsVenue ? '#fff' : '#333' }}>
-                            {ownsVenue ? '✓ Remove' : 'Add'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })}
-                </>
-              )}
-            </View>
-          )}
-        />
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  webLimited: {
+    width: '100%',
+    maxWidth: '50%',
+    paddingHorizontal: 10,
+    alignSelf: 'center',
+  },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   statsContainer: {
@@ -345,7 +354,6 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
   },
-  
 
   card: {
     padding: 16,
