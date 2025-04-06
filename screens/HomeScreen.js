@@ -5,7 +5,9 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db, auth } from '../utils/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+
 const categories = ['Bars', 'Clubs', 'Live Music', 'Events'];
+
 export default function HomeScreen({ navigation }) {
   const [premiumVenues, setPremiumVenues] = useState([]);
   const [regularVenues, setRegularVenues] = useState([]);
@@ -15,6 +17,8 @@ export default function HomeScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [userDoc, setUserDoc] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
 
   const screenWidth = Dimensions.get('window').width;
   const scrollX = useRef(new Animated.Value(0)).current;
